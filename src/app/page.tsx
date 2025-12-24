@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Command, ArrowRight, Loader2, CheckCircle2, AlertCircle, FileImage, Sparkles, ScanLine, Zap, Layers, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -21,43 +20,54 @@ export default function SubmitPage() {
   const [rank, setRank] = useState<number | null>(null);
   const [scanData, setScanData] = useState<any>(null);
   
-  // Refs to access latest state in event callbacks
-  const screenshotRef = useRef<File | null>(null);
-  const stepRef = useRef<'upload' | 'auth' | 'scanning' | 'success'>('upload');
-  
-  const router = useRouter();
   const supabase = createClientBrowser();
 
-  // Update refs when state changes
-  useEffect(() => {
-    screenshotRef.current = screenshot;
-  }, [screenshot]);
-
-  useEffect(() => {
-    stepRef.current = step;
-  }, [step]);
+  // Helper to convert data URL to File
+  const dataURLtoFile = (dataurl: string, filename: string): File => {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, { type: mime });
+  };
 
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
       setAuthLoading(false);
+
+      // Check if returning from auth callback
+      const isAuthCallback = sessionStorage.getItem('authCallback');
+      const pendingScreenshot = sessionStorage.getItem('pendingScreenshot');
+      const pendingName = sessionStorage.getItem('pendingScreenshotName');
+
+      if (isAuthCallback && pendingScreenshot && user) {
+        // Clear the flags
+        sessionStorage.removeItem('authCallback');
+        sessionStorage.removeItem('pendingScreenshot');
+        sessionStorage.removeItem('pendingScreenshotName');
+
+        // Restore screenshot state
+        setPreview(pendingScreenshot);
+        const file = dataURLtoFile(pendingScreenshot, pendingName || 'screenshot.png');
+        setScreenshot(file);
+
+        // Auto-submit
+        handleSubmitAfterAuth(user, file);
+      } else if (isAuthCallback) {
+        // Clear flag if no pending data
+        sessionStorage.removeItem('authCallback');
+      }
     };
     checkUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
-      
-      // Check refs for latest state
-      if (
-        (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && 
-        session?.user && 
-        stepRef.current === 'auth' && 
-        screenshotRef.current
-      ) {
-        // Close popup if it was opened (though this code runs in the parent)
-        handleSubmitAfterAuth(session.user, screenshotRef.current);
-      }
     });
 
     return () => subscription.unsubscribe();
@@ -105,29 +115,20 @@ export default function SubmitPage() {
   const signInWithProvider = async (provider: 'github') => {
     setError(null);
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      // Save screenshot to sessionStorage before redirecting
+      if (preview) {
+        sessionStorage.setItem('pendingScreenshot', preview);
+        sessionStorage.setItem('pendingScreenshotName', screenshot?.name || 'screenshot.png');
+      }
+
+      const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
-          skipBrowserRedirect: true,
         },
       });
 
       if (error) throw error;
-
-      if (data?.url) {
-        // Calculate centered popup position
-        const width = 600;
-        const height = 600;
-        const left = window.screen.width / 2 - width / 2;
-        const top = window.screen.height / 2 - height / 2;
-        
-        window.open(
-          data.url,
-          'SupabaseAuth',
-          `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes,status=yes`
-        );
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed');
     }

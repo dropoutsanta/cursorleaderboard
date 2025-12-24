@@ -1,9 +1,12 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClientBrowser } from '@/lib/supabase';
 
 export default function AuthCallback() {
+  const router = useRouter();
+
   useEffect(() => {
     const handleCallback = async () => {
       const supabase = createClientBrowser();
@@ -15,17 +18,15 @@ export default function AuthCallback() {
         console.error('Auth callback error:', error);
       }
       
-      // Close the popup - the main window will detect the auth state change
-      if (window.opener) {
-        window.close();
-      } else {
-        // If not a popup, redirect to home
-        window.location.href = '/';
-      }
+      // Mark that we're returning from auth
+      sessionStorage.setItem('authCallback', 'true');
+      
+      // Redirect back to home to continue submission
+      router.push('/');
     };
 
     handleCallback();
-  }, []);
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center">
