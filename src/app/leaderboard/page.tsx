@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { Zap, Layers, Activity, Search, Terminal, ArrowUpRight, Filter, Download } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Zap, Layers, Activity, Search, Terminal, ArrowUpRight, Filter, Download, ImageIcon, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Submission {
@@ -17,6 +17,7 @@ interface Submission {
   top_models: string[] | null;
   joined_days_ago: number | null;
   created_at: string;
+  screenshot_url?: string;
 }
 
 function formatTokens(tokens: string): string {
@@ -46,6 +47,7 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/leaderboard')
@@ -133,7 +135,10 @@ export default function LeaderboardPage() {
               <div className="col-span-1 text-right">Agents</div>
               <div className="col-span-1 text-right">Tabs</div>
               <div className="col-span-1 text-right">Streak</div>
-              <div className="col-span-3 pl-4">Top Models</div>
+              <div className="col-span-3 pl-4 flex justify-between items-center">
+                <span>Top Models</span>
+                <span className="sr-only">Screenshot</span>
+              </div>
            </div>
         </div>
 
@@ -193,12 +198,24 @@ export default function LeaderboardPage() {
                    {submission.streak ? `${submission.streak}d` : '-'}
                 </div>
 
-                <div className="col-span-3 pl-4 flex gap-1.5 flex-wrap">
-                   {submission.top_models?.slice(0, 2).map((model) => (
-                      <span key={model} className="px-1.5 py-0.5 rounded-sm bg-[#2b2b2b] border border-[#3e3e3e] text-[10px] text-zinc-400 font-mono">
-                         {model}
-                      </span>
-                   ))}
+                <div className="col-span-3 pl-4 flex items-center justify-between">
+                   <div className="flex gap-1.5 flex-wrap">
+                     {submission.top_models?.slice(0, 2).map((model) => (
+                        <span key={model} className="px-1.5 py-0.5 rounded-sm bg-[#2b2b2b] border border-[#3e3e3e] text-[10px] text-zinc-400 font-mono">
+                           {model}
+                        </span>
+                     ))}
+                   </div>
+                   
+                   {submission.screenshot_url && (
+                     <button 
+                       onClick={() => setSelectedScreenshot(submission.screenshot_url!)}
+                       className="p-1.5 rounded-sm hover:bg-[#2b2b2b] text-zinc-600 hover:text-zinc-300 transition-colors opacity-0 group-hover:opacity-100"
+                       title="View Screenshot"
+                     >
+                       <ImageIcon className="w-3.5 h-3.5" />
+                     </button>
+                   )}
                 </div>
               </motion.div>
             );
@@ -214,6 +231,47 @@ export default function LeaderboardPage() {
           )}
         </div>
       </div>
+
+      {/* Screenshot Modal */}
+      <AnimatePresence>
+        {selectedScreenshot && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedScreenshot(null)}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 md:p-12"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative max-w-5xl w-full max-h-full bg-[#1e1e1e] border border-[#2b2b2b] rounded-lg shadow-2xl overflow-hidden flex flex-col"
+            >
+              <div className="flex items-center justify-between p-3 border-b border-[#2b2b2b] bg-[#1e1e1e]">
+                <div className="flex items-center gap-2 text-xs text-zinc-400 font-mono">
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <span>screenshot.png</span>
+                </div>
+                <button
+                  onClick={() => setSelectedScreenshot(null)}
+                  className="p-1 rounded-sm hover:bg-[#2b2b2b] text-zinc-500 hover:text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-[#111111]">
+                <img 
+                  src={selectedScreenshot} 
+                  alt="Submission Screenshot" 
+                  className="max-w-full max-h-[80vh] object-contain rounded-sm border border-[#2b2b2b]"
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
