@@ -100,7 +100,7 @@ export default function LeaderboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#111111] text-zinc-300 text-sm font-sans selection:bg-cursor-blue/30">
+    <div className="min-h-screen bg-[#111111] text-zinc-300 text-sm font-sans selection:bg-cursor-blue/30 flex flex-col">
       
       {/* Top Navigation Bar / Breadcrumbs */}
       <div className="h-10 border-b border-[#2b2b2b] bg-[#1e1e1e] flex items-center px-4 justify-between sticky top-0 z-50">
@@ -129,7 +129,7 @@ export default function LeaderboardPage() {
                     </div>
                   </div>
 
-      <div className="p-0">
+      <div className="p-0 flex-1">
         <div className="border-b border-[#2b2b2b] bg-[#18181b]">
            <div className="grid grid-cols-12 px-4 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-wider gap-4">
               <div className="col-span-1">#</div>
@@ -165,16 +165,7 @@ export default function LeaderboardPage() {
                   {rank}
                 </div>
                 
-                <div className="col-span-3 flex items-center gap-3">
-                   <div className={cn(
-                      "w-5 h-5 rounded-sm flex items-center justify-center text-[10px] font-mono font-bold",
-                      rank === 1 ? "bg-yellow-500/20 text-yellow-500" :
-                      rank === 2 ? "bg-zinc-400/20 text-zinc-300" :
-                      rank === 3 ? "bg-orange-700/20 text-orange-500" :
-                      "bg-[#2b2b2b] text-zinc-500"
-                   )}>
-                      {submission.name.charAt(0).toUpperCase()}
-                   </div>
+                <div className="col-span-3 flex items-center">
                    <div className="flex flex-col">
                       {submission.social_link ? (
                         <a 
@@ -223,7 +214,7 @@ export default function LeaderboardPage() {
 
                 <div className="col-span-3 pl-4 flex items-center justify-between">
                    <div className="flex gap-1.5 flex-wrap">
-                     {submission.top_models?.slice(0, 2).map((model) => (
+                     {submission.top_models?.slice(0, 3).map((model) => (
                         <span key={model} className="px-1.5 py-0.5 rounded-sm bg-[#2b2b2b] border border-[#3e3e3e] text-[10px] text-zinc-400 font-mono">
                            {model}
                         </span>
@@ -296,7 +287,7 @@ export default function LeaderboardPage() {
           )}
         </AnimatePresence>
 
-      <footer className="py-8 px-6 text-center text-[10px] text-zinc-600 border-t border-zinc-800/50 mt-12">
+      <footer className="py-8 px-6 text-center text-[10px] text-zinc-600 border-t border-zinc-800/50 mt-auto">
         <div className="space-y-1">
           <p>
             Built with ❤️ using Cursor by{' '}
