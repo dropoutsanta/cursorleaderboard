@@ -21,8 +21,8 @@ export default function AuthCallback() {
       // Mark that we're returning from auth
       sessionStorage.setItem('authCallback', 'true');
       
-      // Redirect back to home to continue submission
-      router.push('/');
+      // Redirect back to submit page to continue submission
+      router.push('/submit');
     };
 
     handleCallback();

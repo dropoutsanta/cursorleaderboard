@@ -1,510 +1,302 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Command, ArrowRight, Loader2, CheckCircle2, AlertCircle, FileImage, Sparkles, ScanLine, Zap, Layers, Trophy } from 'lucide-react';
+import { Zap, Layers, Activity, Search, Terminal, ArrowUpRight, Filter, Download, ImageIcon, X, Github } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { createClientBrowser } from '@/lib/supabase';
-import type { User } from '@supabase/supabase-js';
 
-export default function SubmitPage() {
-  const [screenshot, setScreenshot] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+interface Submission {
+  id: string;
+  name: string;
+  tokens: string;
+  agents: number | null;
+  tabs: number | null;
+  streak: number | null;
+  usage_percentile: string | null;
+  top_models: string[] | null;
+  joined_days_ago: number | null;
+  created_at: string;
+  screenshot_url?: string;
+  social_link?: string;
+  social_handle?: string;
+  social_provider?: string;
+}
+
+function formatTokens(tokens: string): string {
+  const num = BigInt(tokens);
+  if (num >= 1_000_000_000n) {
+    return `${(Number(num) / 1_000_000_000).toFixed(2)}B`;
+  } else if (num >= 1_000_000n) {
+    return `${(Number(num) / 1_000_000).toFixed(2)}M`;
+  } else if (num >= 1_000n) {
+    return `${(Number(num) / 1_000).toFixed(2)}K`;
+  }
+  return num.toString();
+}
+
+function formatNumber(num: number | null): string {
+  if (num === null) return '-';
+  if (num >= 1_000_000) {
+    return `${(num / 1_000_000).toFixed(1)}M`;
+  } else if (num >= 1_000) {
+    return `${(num / 1_000).toFixed(1)}K`;
+  }
+  return num.toString();
+}
+
+export default function LeaderboardPage() {
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [step, setStep] = useState<'upload' | 'auth' | 'scanning' | 'success'>('upload');
-  const [rank, setRank] = useState<number | null>(null);
-  const [scanData, setScanData] = useState<any>(null);
-  
-  const supabase = createClientBrowser();
-
-  // Helper to convert data URL to File
-  const dataURLtoFile = (dataurl: string, filename: string): File => {
-    const arr = dataurl.split(',');
-    const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new File([u8arr], filename, { type: mime });
-  };
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      setAuthLoading(false);
-
-      // Check if returning from auth callback
-      const isAuthCallback = sessionStorage.getItem('authCallback');
-      const pendingScreenshot = sessionStorage.getItem('pendingScreenshot');
-      const pendingName = sessionStorage.getItem('pendingScreenshotName');
-
-      if (isAuthCallback && pendingScreenshot && user) {
-        // Clear the flags
-        sessionStorage.removeItem('authCallback');
-        sessionStorage.removeItem('pendingScreenshot');
-        sessionStorage.removeItem('pendingScreenshotName');
-
-        // Restore screenshot state
-        setPreview(pendingScreenshot);
-        const file = dataURLtoFile(pendingScreenshot, pendingName || 'screenshot.png');
-        setScreenshot(file);
-
-        // Auto-submit
-        handleSubmitAfterAuth(user, file);
-      } else if (isAuthCallback) {
-        // Clear flag if no pending data
-        sessionStorage.removeItem('authCallback');
-      }
-    };
-    checkUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleFile = useCallback((file: File) => {
-    if (file && file.type.startsWith('image/')) {
-      setScreenshot(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  }, []);
-
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setIsDragging(true);
-    } else if (e.type === 'dragleave') {
-      setIsDragging(false);
-    }
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFile(e.dataTransfer.files[0]);
-    }
-  }, [handleFile]);
-
-  const handleContinueToAuth = () => {
-    if (!screenshot) {
-      setError('Screenshot required');
-      return;
-    }
-    setStep('auth');
-  };
-
-  const signInWithProvider = async (provider: 'github') => {
-    setError(null);
-    try {
-      // Save screenshot to sessionStorage before redirecting
-      if (preview) {
-        sessionStorage.setItem('pendingScreenshot', preview);
-        sessionStorage.setItem('pendingScreenshotName', screenshot?.name || 'screenshot.png');
-      }
-
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
+    fetch('/api/leaderboard')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) {
+          setError(data.error);
+        } else {
+          setSubmissions(data);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError('Failed to load leaderboard');
+        setLoading(false);
       });
+  }, []);
 
-      if (error) throw error;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
-    }
-  };
+  const filteredSubmissions = submissions.filter(sub => 
+    sub.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const handleSubmitAfterAuth = async (authUser: User, fileToUpload: File) => {
-    setIsSubmitting(true);
-    setError(null);
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#111111] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-4 h-4 bg-cursor-blue animate-pulse rounded-sm" />
+          <div className="text-zinc-500 font-mono text-xs">Loading Resources...</div>
+        </div>
+      </div>
+    );
+  }
 
-    try {
-      const formData = new FormData();
-      formData.append('name', authUser.user_metadata?.user_name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Anonymous');
-      formData.append('screenshot', fileToUpload);
-
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      const response = await fetch('/api/submit', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit');
-      }
-
-      setRank(data.rank);
-      setScanData(data.extracted);
-      setStep('scanning');
-      
-      // Delay to show scanning animation before showing success/rank
-      setTimeout(() => {
-        setStep('success');
-        setSuccess(true);
-      }, 4000);
-      
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      setStep('upload');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!screenshot) {
-      setError('Screenshot required');
-      return;
-    }
-
-    if (user) {
-      await handleSubmitAfterAuth(user, screenshot);
-    } else {
-      handleContinueToAuth();
-    }
-  };
-
-  const handleShare = () => {
-    const text = `I just ranked #${rank} on the Cursor Leaderboard! Check out my 2025 Wrapped stats:`;
-    const url = window.location.origin;
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
-  };
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#111111] flex items-center justify-center p-4">
+        <div className="text-center space-y-4">
+          <div className="text-red-400 font-mono text-xs border border-red-900 bg-red-900/10 px-3 py-1.5 rounded-sm">
+            ERROR: {error}
+          </div>
+          <Link href="/submit" className="inline-block text-zinc-500 hover:text-white transition-colors text-xs font-mono border-b border-zinc-800 hover:border-zinc-500 pb-0.5">
+            Submit Stats
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-hidden relative selection:bg-cursor-blue/30 flex items-center justify-center">
-      <div className="absolute inset-0 bg-grid-white opacity-[0.03] pointer-events-none" />
-      <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-cursor-blue/5 rounded-full blur-[120px] pointer-events-none" />
+    <div className="min-h-screen bg-[#111111] text-zinc-300 text-sm font-sans selection:bg-cursor-blue/30">
       
-      <div className="relative w-full max-w-md p-6">
-        <AnimatePresence mode="wait">
-          {step === 'success' ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 1.05 }}
-              className="text-center space-y-8 py-8"
-            >
-              <div className="space-y-4">
-                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 mb-4 animate-in zoom-in duration-300">
-                  <CheckCircle2 className="w-10 h-10" />
+      {/* Top Navigation Bar / Breadcrumbs */}
+      <div className="h-10 border-b border-[#2b2b2b] bg-[#1e1e1e] flex items-center px-4 justify-between sticky top-0 z-50">
+        <div className="flex items-center gap-2 text-xs text-zinc-500">
+           <Terminal className="w-3.5 h-3.5" />
+           <span>cursor-wrapped</span>
+           <span>/</span>
+           <span className="text-zinc-300">leaderboard</span>
                 </div>
                 
-                <h2 className="text-3xl font-light tracking-tight text-white">Submission Successful</h2>
-                
-                {rank && (
-                  <div className="py-6 px-8 bg-zinc-900/50 border border-zinc-800 rounded-xl backdrop-blur-sm">
-                    <p className="text-zinc-500 text-xs font-mono uppercase tracking-wider mb-2">Your Global Rank</p>
-                    <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-500 font-mono">
-                      #{rank}
+        <div className="flex items-center gap-4">
+           <div className="flex items-center gap-2 px-2 py-1 bg-[#2b2b2b] rounded border border-[#3e3e3e] min-w-[200px]">
+             <Search className="w-3 h-3 text-zinc-500" />
+             <input 
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search..." 
+                className="bg-transparent border-none outline-none text-xs text-zinc-300 w-full placeholder-zinc-600 font-sans"
+              />
+           </div>
+           <Link href="/submit" className="bg-cursor-blue hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1.5">
+              <span>Submit Stats</span>
+              <ArrowUpRight className="w-3 h-3" />
+           </Link>
                     </div>
                   </div>
-                )}
+
+      <div className="p-0">
+        <div className="border-b border-[#2b2b2b] bg-[#18181b]">
+           <div className="grid grid-cols-12 px-4 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-wider gap-4">
+              <div className="col-span-1">#</div>
+              <div className="col-span-3">User</div>
+              <div className="col-span-2 text-right">Tokens</div>
+              <div className="col-span-1 text-right">Agents</div>
+              <div className="col-span-1 text-right">Tabs</div>
+              <div className="col-span-1 text-right">Streak</div>
+              <div className="col-span-3 pl-4 flex justify-between items-center">
+                <span>Top Models</span>
+                <span className="sr-only">Screenshot</span>
+              </div>
+           </div>
               </div>
 
-              <div className="space-y-3">
-                <button
-                  onClick={handleShare}
-                  className="w-full py-3.5 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center gap-2 bg-black hover:bg-zinc-900 text-white border border-zinc-800 shadow-lg shadow-zinc-900/20"
-                >
-                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                  </svg>
-                  <span>Share Ranking</span>
-                </button>
-
-                <a
-                  href="/leaderboard"
-                  className="block w-full py-3.5 px-4 rounded-xl font-medium transition-all duration-300 text-center bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800"
-                >
-                  View Leaderboard
-                </a>
-              </div>
-            </motion.div>
-          ) : step === 'scanning' ? (
+        <div className="divide-y divide-[#1e1e1e]">
+          {filteredSubmissions.map((submission, index) => {
+            const rank = index + 1;
+            const isTopThree = rank <= 3;
+            
+            return (
             <motion.div
-              key="scanning"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="w-full relative"
-            >
-              <div className="relative rounded-xl overflow-hidden border border-white/20 shadow-2xl">
-                {preview && <img src={preview} alt="Scanning" className="w-full h-auto opacity-50 grayscale" />}
+                transition={{ delay: index * 0.02 }}
+                key={submission.id}
+                className={cn(
+                  "grid grid-cols-12 px-4 py-2.5 items-center gap-4 hover:bg-[#1e1e1e] transition-colors cursor-default group",
+                  isTopThree ? "bg-[#1e1e1e]/30" : ""
+                )}
+              >
+                <div className="col-span-1 font-mono text-xs text-zinc-500">
+                  {rank}
+                </div>
                 
-                {/* Scanning Laser */}
-                <motion.div
-                  className="absolute top-0 left-0 right-0 h-1 bg-cursor-blue shadow-[0_0_20px_rgba(55,153,255,0.8)] z-10"
-                  animate={{ top: ['0%', '100%'] }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                />
-                
-                <div className="absolute inset-0 bg-gradient-to-b from-cursor-blue/10 to-transparent pointer-events-none" />
-                
-                {/* Stats Populating Overlay */}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-[2px]">
-                  <div className="w-full max-w-xs space-y-4 p-4">
-                    {scanData && (
-                      <>
-                        <motion.div 
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.5 }}
-                          className="flex items-center justify-between border-b border-white/10 pb-2"
+                <div className="col-span-3 flex items-center gap-3">
+                   <div className={cn(
+                      "w-5 h-5 rounded-sm flex items-center justify-center text-[10px] font-mono font-bold",
+                      rank === 1 ? "bg-yellow-500/20 text-yellow-500" :
+                      rank === 2 ? "bg-zinc-400/20 text-zinc-300" :
+                      rank === 3 ? "bg-orange-700/20 text-orange-500" :
+                      "bg-[#2b2b2b] text-zinc-500"
+                   )}>
+                      {submission.name.charAt(0).toUpperCase()}
+                   </div>
+                   <div className="flex flex-col">
+                      {submission.social_link ? (
+                        <a 
+                          href={submission.social_link} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className={cn(
+                            "text-sm hover:underline flex items-center gap-1.5",
+                            isTopThree ? "text-white font-medium" : "text-zinc-400 group-hover:text-zinc-300"
+                          )}
                         >
-                          <span className="text-zinc-400 font-mono text-xs flex items-center gap-2">
-                            <Sparkles className="w-3 h-3 text-cursor-blue" /> TOKENS
+                          {submission.name}
+                          {submission.social_provider === 'github' && <Github className="w-3 h-3 text-zinc-500" />}
+                          {(submission.social_provider === 'twitter' || submission.social_provider === 'x') && (
+                            <svg className="w-3 h-3 text-zinc-500 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                            </svg>
+                          )}
+                        </a>
+                      ) : (
+                        <span className={cn(
+                           "text-sm",
+                           isTopThree ? "text-white font-medium" : "text-zinc-400 group-hover:text-zinc-300"
+                        )}>
+                          {submission.name}
                           </span>
-                          <span className="text-white font-mono font-bold text-lg">{scanData.tokens}</span>
-                        </motion.div>
-                        
-                        <motion.div 
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 1.2 }}
-                          className="flex items-center justify-between border-b border-white/10 pb-2"
-                        >
-                          <span className="text-zinc-400 font-mono text-xs flex items-center gap-2">
-                            <Zap className="w-3 h-3 text-yellow-400" /> AGENTS
-                          </span>
-                          <span className="text-white font-mono font-bold text-lg">{scanData.agents || '-'}</span>
-                        </motion.div>
-
-                        <motion.div 
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 1.9 }}
-                          className="flex items-center justify-between border-b border-white/10 pb-2"
-                        >
-                           <span className="text-zinc-400 font-mono text-xs flex items-center gap-2">
-                            <Layers className="w-3 h-3 text-purple-400" /> TABS
-                          </span>
-                          <span className="text-white font-mono font-bold text-lg">{scanData.tabs || '-'}</span>
-                        </motion.div>
-
-                        <motion.div 
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ delay: 2.8 }}
-                          className="pt-4 text-center"
-                        >
-                           <div className="text-xs text-cursor-blue font-mono mb-1 animate-pulse">VERIFIED AUTHENTIC</div>
-                           <div className="text-xs text-zinc-500 font-mono">CALCULATING RANK...</div>
-                        </motion.div>
-                      </>
                     )}
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          ) : step === 'auth' ? (
-            <motion.div
-              key="auth"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-8"
-            >
-              <div className="text-center space-y-2">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono tracking-widest text-zinc-400 uppercase mb-4">
-                  <Sparkles className="w-3 h-3" />
-                  <span>Step 2 of 2</span>
+
+                <div className="col-span-2 text-right font-mono text-xs text-zinc-300">
+                   {formatTokens(submission.tokens)}
                 </div>
-                <h1 className="text-3xl md:text-4xl font-light tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60">
-                  Sign in to Publish
-                </h1>
-                <p className="text-zinc-500 font-light text-sm">Choose how you want to appear on the leaderboard</p>
+
+                <div className="col-span-1 text-right font-mono text-xs text-zinc-500">
+                   {formatNumber(submission.agents)}
               </div>
 
-              {isSubmitting ? (
-                <div className="flex flex-col items-center gap-4 py-8">
-                  <Loader2 className="w-8 h-8 animate-spin text-white" />
-                  <span className="text-zinc-400 font-mono text-sm">Processing your stats...</span>
+                <div className="col-span-1 text-right font-mono text-xs text-zinc-500">
+                   {formatNumber(submission.tabs)}
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <button
-                    onClick={() => signInWithProvider('github')}
-                    className="w-full py-3.5 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center gap-3 bg-[#24292e] hover:bg-[#2f363d] text-white border border-white/10"
-                  >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
-                    </svg>
-                    <span>Continue with GitHub</span>
-                  </button>
+
+                <div className="col-span-1 text-right font-mono text-xs text-zinc-500">
+                   {submission.streak ? `${submission.streak}d` : '-'}
                 </div>
-              )}
 
-              <AnimatePresence>
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-mono justify-center"
-                  >
-                    <AlertCircle className="w-3 h-3 flex-shrink-0" />
-                    {error}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
+                <div className="col-span-3 pl-4 flex items-center justify-between">
+                   <div className="flex gap-1.5 flex-wrap">
+                     {submission.top_models?.slice(0, 2).map((model) => (
+                        <span key={model} className="px-1.5 py-0.5 rounded-sm bg-[#2b2b2b] border border-[#3e3e3e] text-[10px] text-zinc-400 font-mono">
+                           {model}
+                        </span>
+                     ))}
+                   </div>
+                   
+                   {submission.screenshot_url && (
               <button
-                onClick={() => setStep('upload')}
-                className="w-full text-center text-zinc-600 hover:text-white transition-colors text-sm font-mono"
+                       onClick={() => setSelectedScreenshot(submission.screenshot_url!)}
+                       className="p-1.5 rounded-sm hover:bg-[#2b2b2b] text-zinc-600 hover:text-zinc-300 transition-colors opacity-0 group-hover:opacity-100"
+                       title="View Screenshot"
               >
-                ← Back
+                       <ImageIcon className="w-3.5 h-3.5" />
               </button>
-
-              <p className="text-center text-[10px] text-zinc-600 pt-2">
-                By continuing, you agree to our{' '}
-                <a href="/terms" className="underline hover:text-zinc-400">Terms</a>
-                {' '}and{' '}
-                <a href="/privacy" className="underline hover:text-zinc-400">Privacy Policy</a>
-              </p>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="upload"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-8"
-            >
-              <div className="text-center space-y-2">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono tracking-widest text-zinc-400 uppercase mb-4">
-                  <Sparkles className="w-3 h-3" />
-                  <span>2025 Wrapped</span>
+                   )}
                 </div>
-                <h1 className="text-4xl md:text-5xl font-light tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60">
-                  CursorScore
-                </h1>
-                <p className="text-zinc-500 font-light text-sm">Upload your Cursor Wrapped to join the leaderboard</p>
-              </div>
+              </motion.div>
+            );
+          })}
 
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="space-y-4">
-                  <div>
-                    <div
-                      onDragEnter={handleDrag}
-                      onDragLeave={handleDrag}
-                      onDragOver={handleDrag}
-                      onDrop={handleDrop}
-                      className={cn(
-                        "relative group cursor-pointer transition-all duration-300 rounded-xl border border-dashed overflow-hidden min-h-[200px] flex items-center justify-center",
-                        isDragging
-                          ? "border-cursor-blue bg-cursor-blue/5 scale-[1.02]"
-                          : preview
-                          ? "border-white/20 bg-white/5"
-                          : "border-white/10 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/20"
-                      )}
-                    >
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-                        className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
-                      />
-                      
-                      <div className="p-6 text-center w-full">
-                        {preview ? (
-                          <div className="relative w-full">
-                            <div className="flex items-center justify-center gap-2 text-xs text-zinc-400 mb-3 font-mono">
-                              <FileImage className="w-3 h-3" />
-                              <span className="truncate max-w-[150px]">{screenshot?.name}</span>
+          {filteredSubmissions.length === 0 && (
+             <div className="py-12 text-center">
+                <div className="inline-block p-3 rounded-full bg-[#1e1e1e] mb-3">
+                   <Filter className="w-5 h-5 text-zinc-600" />
                             </div>
-                            <div className="rounded-lg overflow-hidden border border-white/10 shadow-lg mx-auto max-w-[200px]">
-                              <img src={preview} alt="Preview" className="w-full h-auto object-cover opacity-90" />
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mx-auto group-hover:scale-110 group-hover:bg-white/10 transition-all duration-300">
-                              <Upload className="w-5 h-5 text-zinc-400 group-hover:text-white" />
-                            </div>
-                            <div>
-                              <p className="text-sm text-zinc-300 font-medium">Upload your Cursor Wrapped</p>
-                              <p className="text-xs text-zinc-600 mt-1 font-mono">Drag & drop or click to browse</p>
-                            </div>
+                <p className="text-zinc-500 text-sm">No results found matching "{searchTerm}"</p>
                           </div>
                         )}
                       </div>
                     </div>
-                  </div>
+
+      {/* Screenshot Modal */}
+      <AnimatePresence>
+        {selectedScreenshot && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedScreenshot(null)}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 md:p-12"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative max-w-5xl w-full max-h-full bg-[#1e1e1e] border border-[#2b2b2b] rounded-lg shadow-2xl overflow-hidden flex flex-col"
+            >
+              <div className="flex items-center justify-between p-3 border-b border-[#2b2b2b] bg-[#1e1e1e]">
+                <div className="flex items-center gap-2 text-xs text-zinc-400 font-mono">
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <span>screenshot.png</span>
                 </div>
-
-                <AnimatePresence>
-                  {error && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-mono justify-center"
-                    >
-                      <AlertCircle className="w-3 h-3 flex-shrink-0" />
-                      {error}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
                 <button
-                  type="submit"
-                  disabled={!screenshot}
-                  className={cn(
-                    "w-full py-3.5 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center gap-2 group text-sm",
-                    !screenshot
-                      ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
-                      : "bg-white text-black hover:bg-zinc-200 hover:scale-[1.01] active:scale-[0.99]"
-                  )}
+                  onClick={() => setSelectedScreenshot(null)}
+                  className="p-1 rounded-sm hover:bg-[#2b2b2b] text-zinc-500 hover:text-white transition-colors"
                 >
-                  <span>{user ? 'Submit Stats' : 'Continue'}</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <X className="w-4 h-4" />
                 </button>
-
-                <div className="text-center pt-2">
-                  <a
-                    href="/leaderboard"
-                    className="inline-flex items-center gap-2 text-[10px] text-zinc-600 hover:text-white transition-colors font-mono uppercase tracking-wider"
-                  >
-                    <Command className="w-3 h-3" />
-                    <span>View Leaderboard</span>
-                  </a>
+              </div>
+              <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-[#111111]">
+                <img 
+                  src={selectedScreenshot} 
+                  alt="Submission Screenshot" 
+                  className="max-w-full max-h-[80vh] object-contain rounded-sm border border-[#2b2b2b]"
+                />
                 </div>
-              </form>
+            </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
 
-      <footer className="fixed bottom-0 left-0 right-0 py-4 px-6 text-center text-[10px] text-zinc-600 bg-gradient-to-t from-black to-transparent">
+      <footer className="py-8 px-6 text-center text-[10px] text-zinc-600 border-t border-zinc-800/50 mt-12">
         <div className="space-y-1">
           <p>
             Built with ❤️ using Cursor by{' '}
