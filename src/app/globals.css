@@ -1,10 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #09090b;
+  --background: #111111;
   --foreground: #fafafa;
-  --muted: #71717a;
-  --border: #27272a;
+  --muted: #a1a1aa;
+  --border: #2b2b2b;
+  --cursor-blue: #3799FF;
+  --input-bg: #18181b;
 }
 
 @theme inline {
@@ -12,6 +14,8 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-border: var(--border);
+  --color-cursor-blue: var(--cursor-blue);
+  --color-input-bg: var(--input-bg);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -19,7 +23,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
@@ -28,26 +32,36 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Subtle Grid Background */
-body::before {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+/* Cursor-like Grid */
+.bg-grid-white {
   background-image: 
-    linear-gradient(to right, #27272a 1px, transparent 1px),
-    linear-gradient(to bottom, #27272a 1px, transparent 1px);
-  background-size: 4rem 4rem;
-  mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
-  pointer-events: none;
-  opacity: 0.15;
-  z-index: -1;
+    linear-gradient(to right, #2b2b2b 1px, transparent 1px),
+    linear-gradient(to bottom, #2b2b2b 1px, transparent 1px);
+  background-size: 20px 20px;
+  mask-image: radial-gradient(ellipse at center, black, transparent 80%);
 }
 
 /* Selection color */
 ::selection {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(55, 153, 255, 0.3);
   color: white;
+}
+
+/* Custom Scrollbar - VS Code style */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 0px;
+  border: 2px solid #111111;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4f4f4f;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
 }

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -17,7 +20,6 @@ interface ExtractedStats {
 }
 
 function parseTokens(tokenStr: string): bigint {
-  // Remove commas and parse
   const cleaned = tokenStr.replace(/,/g, '').toUpperCase();
   
   if (cleaned.endsWith('B')) {
@@ -49,28 +51,59 @@ function parseDaysAgo(str: string | undefined): number | null {
 
 export async function POST(request: NextRequest) {
   try {
+    // Get the authorization header
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.split(' ')[1];
+    
+    // Create a client with the user's token to verify auth
+    const supabaseAuth = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    });
+
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Invalid session' },
+        { status: 401 }
+      );
+    }
+
+    // Use service role client for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
     const formData = await request.formData();
     const name = formData.get('name') as string;
-    const email = formData.get('email') as string;
     const screenshot = formData.get('screenshot') as File;
 
-    if (!name || !email || !screenshot) {
+    if (!name || !screenshot) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    // Check if email already exists
+    // Check if user already submitted
     const { data: existing } = await supabase
       .from('submissions')
       .select('id')
-      .eq('email', email)
+      .eq('user_id', user.id)
       .single();
 
     if (existing) {
       return NextResponse.json(
-        { error: 'Email already submitted' },
+        { error: 'You have already submitted your stats' },
         { status: 400 }
       );
     }
@@ -122,7 +155,6 @@ If any value is not visible, use null for that field. Be precise with the token 
     // Parse the JSON response
     let extractedStats: ExtractedStats;
     try {
-      // Remove markdown code blocks if present
       const jsonContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       extractedStats = JSON.parse(jsonContent);
     } catch (e) {
@@ -160,8 +192,9 @@ If any value is not visible, use null for that field. Be precise with the token 
 
     // Insert into database
     const { error: dbError } = await supabase.from('submissions').insert({
+      user_id: user.id,
       name,
-      email,
+      email: user.email,
       screenshot_url: urlData.publicUrl,
       tokens: tokens.toString(),
       agents,
@@ -186,4 +219,3 @@ If any value is not visible, use null for that field. Be precise with the token 
     );
   }
 }
-
