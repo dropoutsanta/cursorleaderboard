@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
 
     if (provider === 'github' && userName) {
       socialLink = `https://github.com/${userName}`;
-    } else if (provider === 'twitter' && userName) {
+    } else if ((provider === 'twitter' || provider === 'x') && userName) {
       socialLink = `https://x.com/${userName}`;
     }
 

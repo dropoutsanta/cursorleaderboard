@@ -188,7 +188,7 @@ export default function LeaderboardPage() {
                         >
                           {submission.name}
                           {submission.social_provider === 'github' && <Github className="w-3 h-3 text-zinc-500" />}
-                          {submission.social_provider === 'twitter' && <Twitter className="w-3 h-3 text-zinc-500" />}
+                          {(submission.social_provider === 'twitter' || submission.social_provider === 'x') && <Twitter className="w-3 h-3 text-zinc-500" />}
                         </a>
                       ) : (
                         <span className={cn(

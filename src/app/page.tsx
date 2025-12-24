@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Command, ArrowRight, Loader2, CheckCircle2, AlertCircle, FileImage, Sparkles, Share2, Twitter } from 'lucide-react';
+import { Upload, Command, ArrowRight, Loader2, CheckCircle2, AlertCircle, FileImage, Sparkles, Twitter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClientBrowser } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
@@ -19,8 +19,22 @@ export default function SubmitPage() {
   const [authLoading, setAuthLoading] = useState(true);
   const [step, setStep] = useState<'upload' | 'auth'>('upload');
   const [rank, setRank] = useState<number | null>(null);
+  
+  // Refs to access latest state in event callbacks
+  const screenshotRef = useRef<File | null>(null);
+  const stepRef = useRef<'upload' | 'auth'>('upload');
+  
   const router = useRouter();
   const supabase = createClientBrowser();
+
+  // Update refs when state changes
+  useEffect(() => {
+    screenshotRef.current = screenshot;
+  }, [screenshot]);
+
+  useEffect(() => {
+    stepRef.current = step;
+  }, [step]);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -32,8 +46,16 @@ export default function SubmitPage() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
-      if (session?.user && step === 'auth' && screenshot) {
-        handleSubmitAfterAuth(session.user);
+      
+      // Check refs for latest state
+      if (
+        (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && 
+        session?.user && 
+        stepRef.current === 'auth' && 
+        screenshotRef.current
+      ) {
+        // Close popup if it was opened (though this code runs in the parent)
+        handleSubmitAfterAuth(session.user, screenshotRef.current);
       }
     });
 
@@ -79,27 +101,45 @@ export default function SubmitPage() {
     setStep('auth');
   };
 
-  const signInWithProvider = async (provider: 'github' | 'twitter') => {
+  const signInWithProvider = async (provider: 'github' | 'x') => {
     setError(null);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/`,
-      },
-    });
-    if (error) {
-      setError(error.message);
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/`,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        // Calculate centered popup position
+        const width = 600;
+        const height = 600;
+        const left = window.screen.width / 2 - width / 2;
+        const top = window.screen.height / 2 - height / 2;
+        
+        window.open(
+          data.url,
+          'SupabaseAuth',
+          `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes,status=yes`
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Authentication failed');
     }
   };
 
-  const handleSubmitAfterAuth = async (authUser: User) => {
+  const handleSubmitAfterAuth = async (authUser: User, fileToUpload: File) => {
     setIsSubmitting(true);
     setError(null);
 
     try {
       const formData = new FormData();
       formData.append('name', authUser.user_metadata?.user_name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Anonymous');
-      formData.append('screenshot', screenshot!);
+      formData.append('screenshot', fileToUpload);
 
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -119,8 +159,8 @@ export default function SubmitPage() {
 
       setRank(data.rank);
       setSuccess(true);
-      // No longer auto-redirecting so they can see rank and share
     } catch (err) {
+      console.error(err);
       setError(err instanceof Error ? err.message : 'An error occurred');
       setStep('upload');
     } finally {
@@ -137,7 +177,7 @@ export default function SubmitPage() {
     }
 
     if (user) {
-      await handleSubmitAfterAuth(user);
+      await handleSubmitAfterAuth(user, screenshot);
     } else {
       handleContinueToAuth();
     }
@@ -145,8 +185,8 @@ export default function SubmitPage() {
 
   const handleShare = () => {
     const text = `I just ranked #${rank} on the Cursor Leaderboard! Check out my 2025 Wrapped stats:`;
-    const url = 'https://cursor-leaderboard.com'; // Replace with actual domain if known or window.location.origin
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.origin)}`, '_blank');
+    const url = window.location.origin;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
   };
 
   return (
@@ -234,7 +274,7 @@ export default function SubmitPage() {
                   </button>
 
                   <button
-                    onClick={() => signInWithProvider('twitter')}
+                    onClick={() => signInWithProvider('x')}
                     className="w-full py-3.5 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center gap-3 bg-black hover:bg-zinc-900 text-white border border-white/20"
                   >
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
