@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Command, ArrowRight, Loader2, CheckCircle2, AlertCircle, FileImage, Sparkles } from 'lucide-react';
+import { Upload, Command, ArrowRight, Loader2, CheckCircle2, AlertCircle, FileImage, Sparkles, Share2, Twitter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClientBrowser } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
@@ -18,6 +18,7 @@ export default function SubmitPage() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [step, setStep] = useState<'upload' | 'auth'>('upload');
+  const [rank, setRank] = useState<number | null>(null);
   const router = useRouter();
   const supabase = createClientBrowser();
 
@@ -116,10 +117,9 @@ export default function SubmitPage() {
         throw new Error(data.error || 'Failed to submit');
       }
 
+      setRank(data.rank);
       setSuccess(true);
-      setTimeout(() => {
-        router.push('/leaderboard');
-      }, 1500);
+      // No longer auto-redirecting so they can see rank and share
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setStep('upload');
@@ -143,6 +143,12 @@ export default function SubmitPage() {
     }
   };
 
+  const handleShare = () => {
+    const text = `I just ranked #${rank} on the Cursor Leaderboard! Check out my 2025 Wrapped stats:`;
+    const url = 'https://cursor-leaderboard.com'; // Replace with actual domain if known or window.location.origin
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.origin)}`, '_blank');
+  };
+
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden relative selection:bg-cursor-blue/30 flex items-center justify-center">
       <div className="absolute inset-0 bg-grid-white opacity-[0.03] pointer-events-none" />
@@ -155,13 +161,41 @@ export default function SubmitPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.05 }}
-              className="text-center space-y-4 py-12"
+              className="text-center space-y-8 py-8"
             >
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 text-green-400 mb-2 border border-green-500/20">
-                <CheckCircle2 className="w-8 h-8" />
+              <div className="space-y-4">
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 mb-4 animate-in zoom-in duration-300">
+                  <CheckCircle2 className="w-10 h-10" />
+                </div>
+                
+                <h2 className="text-3xl font-light tracking-tight text-white">Submission Successful</h2>
+                
+                {rank && (
+                  <div className="py-6 px-8 bg-zinc-900/50 border border-zinc-800 rounded-xl backdrop-blur-sm">
+                    <p className="text-zinc-500 text-xs font-mono uppercase tracking-wider mb-2">Your Global Rank</p>
+                    <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-500 font-mono">
+                      #{rank}
+                    </div>
+                  </div>
+                )}
               </div>
-              <h2 className="text-2xl font-light tracking-tight">Stats Uploaded</h2>
-              <p className="text-zinc-500 font-mono text-sm">Redirecting to leaderboard...</p>
+
+              <div className="space-y-3">
+                <button
+                  onClick={handleShare}
+                  className="w-full py-3.5 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center gap-2 bg-[#1DA1F2] hover:bg-[#1a94df] text-white shadow-lg shadow-blue-900/20"
+                >
+                  <Twitter className="w-4 h-4 fill-current" />
+                  <span>Share Ranking</span>
+                </button>
+
+                <a
+                  href="/leaderboard"
+                  className="block w-full py-3.5 px-4 rounded-xl font-medium transition-all duration-300 text-center bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800"
+                >
+                  View Leaderboard
+                </a>
+              </div>
             </motion.div>
           ) : step === 'auth' ? (
             <motion.div
@@ -246,9 +280,9 @@ export default function SubmitPage() {
                   <span>2025 Wrapped</span>
                 </div>
                 <h1 className="text-4xl md:text-5xl font-light tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60">
-                  Cursor Stats
+                  CursorScore
                 </h1>
-                <p className="text-zinc-500 font-light text-sm">Upload your wrapped to join the leaderboard</p>
+                <p className="text-zinc-500 font-light text-sm">Upload your Cursor Wrapped to join the leaderboard</p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-5">
@@ -292,7 +326,7 @@ export default function SubmitPage() {
                               <Upload className="w-5 h-5 text-zinc-400 group-hover:text-white" />
                             </div>
                             <div>
-                              <p className="text-sm text-zinc-300 font-medium">Upload your 2025 Wrapped</p>
+                              <p className="text-sm text-zinc-300 font-medium">Upload your Cursor Wrapped</p>
                               <p className="text-xs text-zinc-600 mt-1 font-mono">Drag & drop or click to browse</p>
                             </div>
                           </div>

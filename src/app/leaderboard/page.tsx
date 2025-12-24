@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Layers, Activity, Search, Terminal, ArrowUpRight, Filter, Download, ImageIcon, X } from 'lucide-react';
+import { Zap, Layers, Activity, Search, Terminal, ArrowUpRight, Filter, Download, ImageIcon, X, Github, Twitter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Submission {
@@ -18,6 +18,9 @@ interface Submission {
   joined_days_ago: number | null;
   created_at: string;
   screenshot_url?: string;
+  social_link?: string;
+  social_handle?: string;
+  social_provider?: string;
 }
 
 function formatTokens(tokens: string): string {
@@ -173,12 +176,28 @@ export default function LeaderboardPage() {
                       {submission.name.charAt(0).toUpperCase()}
                    </div>
                    <div className="flex flex-col">
-                      <span className={cn(
-                         "text-sm",
-                         isTopThree ? "text-white font-medium" : "text-zinc-400 group-hover:text-zinc-300"
-                      )}>
-                        {submission.name}
-                      </span>
+                      {submission.social_link ? (
+                        <a 
+                          href={submission.social_link} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className={cn(
+                            "text-sm hover:underline flex items-center gap-1.5",
+                            isTopThree ? "text-white font-medium" : "text-zinc-400 group-hover:text-zinc-300"
+                          )}
+                        >
+                          {submission.name}
+                          {submission.social_provider === 'github' && <Github className="w-3 h-3 text-zinc-500" />}
+                          {submission.social_provider === 'twitter' && <Twitter className="w-3 h-3 text-zinc-500" />}
+                        </a>
+                      ) : (
+                        <span className={cn(
+                           "text-sm",
+                           isTopThree ? "text-white font-medium" : "text-zinc-400 group-hover:text-zinc-300"
+                        )}>
+                          {submission.name}
+                        </span>
+                      )}
                    </div>
                 </div>
 

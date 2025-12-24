@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cursor 2025 Leaderboard",
-  description: "Compare your Cursor 2025 Wrapped stats with others",
+  title: "CursorScore - Cursor 2025 Wrapped Leaderboard",
+  description: "Compare your Cursor 2025 Wrapped stats with others on CursorScore",
 };
 
 export default function RootLayout({

@@ -94,6 +94,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Determine social info
+    const identity = user.identities?.[0];
+    const provider = identity?.provider;
+    const userName = user.user_metadata?.user_name || user.user_metadata?.name;
+    let socialLink = null;
+    let socialHandle = userName;
+
+    if (provider === 'github' && userName) {
+      socialLink = `https://github.com/${userName}`;
+    } else if (provider === 'twitter' && userName) {
+      socialLink = `https://x.com/${userName}`;
+    }
+
     // Check if user already submitted
     const { data: existing } = await supabase
       .from('submissions')
@@ -203,6 +216,9 @@ If any value is not visible, use null for that field. Be precise with the token 
       usage_percentile: extractedStats.usage_percentile || null,
       top_models: extractedStats.top_models || null,
       joined_days_ago: joinedDaysAgo,
+      social_link: socialLink,
+      social_handle: socialHandle,
+      social_provider: provider,
     });
 
     if (dbError) {
@@ -210,7 +226,19 @@ If any value is not visible, use null for that field. Be precise with the token 
       throw new Error('Failed to save submission');
     }
 
-    return NextResponse.json({ success: true });
+    // Get rank
+    const { count, error: countError } = await supabase
+      .from('submissions')
+      .select('*', { count: 'exact', head: true })
+      .gt('tokens', tokens.toString());
+    
+    const rank = (count || 0) + 1;
+
+    return NextResponse.json({ 
+      success: true,
+      rank,
+      id: user.id // using user_id as identifier for sharing, or we could fetch the new submission id
+    });
   } catch (error) {
     console.error('Submit error:', error);
     return NextResponse.json(
