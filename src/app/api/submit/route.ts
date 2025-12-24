@@ -38,8 +38,20 @@ function parseTokens(tokenStr: string): bigint {
 
 function parseNumber(str: string | undefined): number | null {
   if (!str) return null;
-  const cleaned = str.replace(/,/g, '').replace(/[^\d.]/g, '');
-  const num = parseFloat(cleaned);
+  const cleaned = str.replace(/,/g, '').toUpperCase().trim();
+  
+  if (cleaned.endsWith('B')) {
+    const num = parseFloat(cleaned.slice(0, -1));
+    return isNaN(num) ? null : Math.floor(num * 1_000_000_000);
+  } else if (cleaned.endsWith('M')) {
+    const num = parseFloat(cleaned.slice(0, -1));
+    return isNaN(num) ? null : Math.floor(num * 1_000_000);
+  } else if (cleaned.endsWith('K')) {
+    const num = parseFloat(cleaned.slice(0, -1));
+    return isNaN(num) ? null : Math.floor(num * 1_000);
+  }
+  
+  const num = parseFloat(cleaned.replace(/[^\d.]/g, ''));
   return isNaN(num) ? null : Math.floor(num);
 }
 
