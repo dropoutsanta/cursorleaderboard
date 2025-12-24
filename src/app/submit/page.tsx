@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Command, ArrowRight, Loader2, CheckCircle2, AlertCircle, FileImage, Sparkles, ScanLine, Zap, Layers, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -418,6 +419,9 @@ export default function SubmitPage() {
               className="space-y-8"
             >
               <div className="text-center space-y-2">
+                <div className="flex justify-center mb-4">
+                  <Image src="/logo.png" alt="CursorScore" width={80} height={80} className="rounded-xl" />
+                </div>
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono tracking-widest text-zinc-400 uppercase mb-4">
                   <Sparkles className="w-3 h-3" />
                   <span>2025 Wrapped</span>

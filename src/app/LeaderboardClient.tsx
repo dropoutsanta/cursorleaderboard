@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Terminal, ArrowUpRight, Filter, ImageIcon, X, Github, Share2, Check } from 'lucide-react';
+import { Search, ArrowUpRight, Filter, ImageIcon, X, Github, Share2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Submission {
@@ -143,12 +144,10 @@ export default function LeaderboardClient({ initialUser }: LeaderboardClientProp
       
       {/* Top Navigation Bar / Breadcrumbs */}
       <div className="h-10 border-b border-[#2b2b2b] bg-[#1e1e1e] flex items-center px-4 justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-2 text-xs text-zinc-500">
-           <Terminal className="w-3.5 h-3.5" />
-           <span>cursor-wrapped</span>
-           <span>/</span>
-           <span className="text-zinc-300">leaderboard</span>
-                </div>
+        <Link href="/" className="flex items-center gap-2 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+           <Image src="/logo.png" alt="CursorScore" width={20} height={20} className="rounded-sm" />
+           <span className="text-zinc-300 font-medium">CursorScore</span>
+        </Link>
                 
         <div className="flex items-center gap-4">
            <div className="flex items-center gap-2 px-2 py-1 bg-[#2b2b2b] rounded border border-[#3e3e3e] min-w-[200px]">

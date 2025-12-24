@@ -15,6 +15,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "CursorScore - Cursor 2025 Wrapped Leaderboard",
   description: "Compare your Cursor 2025 Wrapped stats with others on CursorScore",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({
