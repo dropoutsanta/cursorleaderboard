@@ -390,6 +390,13 @@ export default function SubmitPage() {
               >
                 ← Back
               </button>
+
+              <p className="text-center text-[10px] text-zinc-600 pt-2">
+                By continuing, you agree to our{' '}
+                <a href="/terms" className="underline hover:text-zinc-400">Terms</a>
+                {' '}and{' '}
+                <a href="/privacy" className="underline hover:text-zinc-400">Privacy Policy</a>
+              </p>
             </motion.div>
           ) : (
             <motion.div
@@ -503,6 +510,23 @@ export default function SubmitPage() {
           )}
         </AnimatePresence>
       </div>
+
+      <footer className="fixed bottom-0 left-0 right-0 py-4 px-6 text-center text-[10px] text-zinc-600 bg-gradient-to-t from-black to-transparent">
+        <div className="space-y-1">
+          <p>
+            Built with ❤️ using Cursor by{' '}
+            <a href="https://x.com/dropoutsanta" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">@dropoutsanta</a>
+            {' & '}
+            <a href="https://x.com/evahteev" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">@evahteev</a>
+          </p>
+          <p className="text-zinc-700">
+            Not affiliated with Cursor or Anysphere.{' '}
+            <a href="/privacy" className="hover:text-zinc-500">Privacy</a>
+            {' · '}
+            <a href="/terms" className="hover:text-zinc-500">Terms</a>
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }

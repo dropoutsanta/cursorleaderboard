@@ -291,6 +291,23 @@ export default function LeaderboardPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <footer className="py-8 px-6 text-center text-[10px] text-zinc-600 border-t border-zinc-800/50 mt-12">
+        <div className="space-y-1">
+          <p>
+            Built with ❤️ using Cursor by{' '}
+            <a href="https://x.com/dropoutsanta" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">@dropoutsanta</a>
+            {' & '}
+            <a href="https://x.com/evahteev" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">@evahteev</a>
+          </p>
+          <p className="text-zinc-700">
+            Not affiliated with Cursor or Anysphere.{' '}
+            <a href="/privacy" className="hover:text-zinc-500">Privacy</a>
+            {' · '}
+            <a href="/terms" className="hover:text-zinc-500">Terms</a>
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -49,9 +49,17 @@ export default function PrivacyPolicy() {
         </section>
 
         <section>
+          <h2 className="text-lg font-semibold text-white mb-2">Not Affiliated</h2>
+          <p>
+            Cursor Score is an independent community project. We are not affiliated with, endorsed by, or connected to Cursor or Anysphere Inc. in any way.
+          </p>
+        </section>
+
+        <section>
           <h2 className="text-lg font-semibold text-white mb-2">Contact</h2>
           <p>
-            Questions? Reach out on X or GitHub.
+            Questions? Email us at{' '}
+            <a href="mailto:nick@dbee.io" className="text-white underline hover:text-zinc-300">nick@dbee.io</a>
           </p>
         </section>
       </div>
