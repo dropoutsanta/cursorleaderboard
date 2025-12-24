@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Command, ArrowRight, Loader2, CheckCircle2, AlertCircle, FileImage, Sparkles, Twitter } from 'lucide-react';
+import { Upload, Command, ArrowRight, Loader2, CheckCircle2, AlertCircle, FileImage, Sparkles, Twitter, ScanLine, Zap, Layers, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClientBrowser } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
@@ -17,12 +17,13 @@ export default function SubmitPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [step, setStep] = useState<'upload' | 'auth'>('upload');
+  const [step, setStep] = useState<'upload' | 'auth' | 'scanning' | 'success'>('upload');
   const [rank, setRank] = useState<number | null>(null);
+  const [scanData, setScanData] = useState<any>(null);
   
   // Refs to access latest state in event callbacks
   const screenshotRef = useRef<File | null>(null);
-  const stepRef = useRef<'upload' | 'auth'>('upload');
+  const stepRef = useRef<'upload' | 'auth' | 'scanning' | 'success'>('upload');
   
   const router = useRouter();
   const supabase = createClientBrowser();
@@ -158,7 +159,15 @@ export default function SubmitPage() {
       }
 
       setRank(data.rank);
-      setSuccess(true);
+      setScanData(data.extracted);
+      setStep('scanning');
+      
+      // Delay to show scanning animation before showing success/rank
+      setTimeout(() => {
+        setStep('success');
+        setSuccess(true);
+      }, 4000);
+      
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -196,7 +205,7 @@ export default function SubmitPage() {
       
       <div className="relative w-full max-w-md p-6">
         <AnimatePresence mode="wait">
-          {success ? (
+          {step === 'success' ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -235,6 +244,82 @@ export default function SubmitPage() {
                 >
                   View Leaderboard
                 </a>
+              </div>
+            </motion.div>
+          ) : step === 'scanning' ? (
+            <motion.div
+              key="scanning"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="w-full relative"
+            >
+              <div className="relative rounded-xl overflow-hidden border border-white/20 shadow-2xl">
+                {preview && <img src={preview} alt="Scanning" className="w-full h-auto opacity-50 grayscale" />}
+                
+                {/* Scanning Laser */}
+                <motion.div
+                  className="absolute top-0 left-0 right-0 h-1 bg-cursor-blue shadow-[0_0_20px_rgba(55,153,255,0.8)] z-10"
+                  animate={{ top: ['0%', '100%'] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                />
+                
+                <div className="absolute inset-0 bg-gradient-to-b from-cursor-blue/10 to-transparent pointer-events-none" />
+                
+                {/* Stats Populating Overlay */}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-[2px]">
+                  <div className="w-full max-w-xs space-y-4 p-4">
+                    {scanData && (
+                      <>
+                        <motion.div 
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.5 }}
+                          className="flex items-center justify-between border-b border-white/10 pb-2"
+                        >
+                          <span className="text-zinc-400 font-mono text-xs flex items-center gap-2">
+                            <Sparkles className="w-3 h-3 text-cursor-blue" /> TOKENS
+                          </span>
+                          <span className="text-white font-mono font-bold text-lg">{scanData.tokens}</span>
+                        </motion.div>
+                        
+                        <motion.div 
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 1.2 }}
+                          className="flex items-center justify-between border-b border-white/10 pb-2"
+                        >
+                          <span className="text-zinc-400 font-mono text-xs flex items-center gap-2">
+                            <Zap className="w-3 h-3 text-yellow-400" /> AGENTS
+                          </span>
+                          <span className="text-white font-mono font-bold text-lg">{scanData.agents || '-'}</span>
+                        </motion.div>
+
+                        <motion.div 
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 1.9 }}
+                          className="flex items-center justify-between border-b border-white/10 pb-2"
+                        >
+                           <span className="text-zinc-400 font-mono text-xs flex items-center gap-2">
+                            <Layers className="w-3 h-3 text-purple-400" /> TABS
+                          </span>
+                          <span className="text-white font-mono font-bold text-lg">{scanData.tabs || '-'}</span>
+                        </motion.div>
+
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: 2.8 }}
+                          className="pt-4 text-center"
+                        >
+                           <div className="text-xs text-cursor-blue font-mono mb-1 animate-pulse">VERIFIED AUTHENTIC</div>
+                           <div className="text-xs text-zinc-500 font-mono">CALCULATING RANK...</div>
+                        </motion.div>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
             </motion.div>
           ) : step === 'auth' ? (

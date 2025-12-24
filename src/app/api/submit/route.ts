@@ -237,7 +237,15 @@ If any value is not visible, use null for that field. Be precise with the token 
     return NextResponse.json({ 
       success: true,
       rank,
-      id: user.id // using user_id as identifier for sharing, or we could fetch the new submission id
+      id: user.id,
+      extracted: {
+        tokens: extractedStats.tokens,
+        agents: extractedStats.agents,
+        tabs: extractedStats.tabs,
+        streak: extractedStats.streak,
+        top_models: extractedStats.top_models,
+        usage_percentile: extractedStats.usage_percentile
+      }
     });
   } catch (error) {
     console.error('Submit error:', error);
