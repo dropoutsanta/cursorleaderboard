@@ -8,24 +8,43 @@ export default function AuthCallback() {
   const router = useRouter();
 
   useEffect(() => {
-    const handleCallback = async () => {
-      const supabase = createClientBrowser();
-      
-      // Get the session from the URL hash (Supabase puts tokens there after OAuth)
-      const { error } = await supabase.auth.getSession();
+    const supabase = createClientBrowser();
+    
+    // Listen for auth state changes - this handles the OAuth code exchange
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        // Mark that we're returning from auth
+        sessionStorage.setItem('authCallback', 'true');
+        
+        // Redirect back to submit page to continue submission
+        router.push('/submit');
+      } else if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        // Ignore these events
+      }
+    });
+
+    // Also check if already signed in (in case the event already fired)
+    const checkExistingSession = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
         console.error('Auth callback error:', error);
+        router.push('/submit');
+        return;
       }
       
-      // Mark that we're returning from auth
-      sessionStorage.setItem('authCallback', 'true');
-      
-      // Redirect back to submit page to continue submission
-      router.push('/submit');
+      if (session) {
+        // Already have a session, redirect
+        sessionStorage.setItem('authCallback', 'true');
+        router.push('/submit');
+      }
     };
+    
+    checkExistingSession();
 
-    handleCallback();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [router]);
 
   return (

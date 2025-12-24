@@ -36,17 +36,18 @@ export default function SubmitPage() {
   };
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      setAuthLoading(false);
+    let hasHandledCallback = false;
 
-      // Check if returning from auth callback
+    const handleAuthCallback = (authUser: User) => {
+      if (hasHandledCallback) return;
+      
       const isAuthCallback = sessionStorage.getItem('authCallback');
       const pendingScreenshot = sessionStorage.getItem('pendingScreenshot');
       const pendingName = sessionStorage.getItem('pendingScreenshotName');
 
-      if (isAuthCallback && pendingScreenshot && user) {
+      if (isAuthCallback && pendingScreenshot && authUser) {
+        hasHandledCallback = true;
+        
         // Clear the flags
         sessionStorage.removeItem('authCallback');
         sessionStorage.removeItem('pendingScreenshot');
@@ -58,16 +59,33 @@ export default function SubmitPage() {
         setScreenshot(file);
 
         // Auto-submit
-        handleSubmitAfterAuth(user, file);
+        handleSubmitAfterAuth(authUser, file);
       } else if (isAuthCallback) {
         // Clear flag if no pending data
         sessionStorage.removeItem('authCallback');
       }
     };
+
+    const checkUser = async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      setUser(authUser);
+      setAuthLoading(false);
+
+      if (authUser) {
+        handleAuthCallback(authUser);
+      }
+    };
     checkUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
+      const authUser = session?.user ?? null;
+      setUser(authUser);
+      setAuthLoading(false);
+      
+      // Handle auth callback when user signs in
+      if (event === 'SIGNED_IN' && authUser) {
+        handleAuthCallback(authUser);
+      }
     });
 
     return () => subscription.unsubscribe();
