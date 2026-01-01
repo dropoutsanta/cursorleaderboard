@@ -7,6 +7,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ArrowUpRight, Filter, ImageIcon, X, Github, Share2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// #region agent log
+if (typeof window !== 'undefined') {
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('code');
+  if (code) {
+    console.log('[DEBUG] Main page received OAuth code param', { hasCode: true, codePrefix: code.substring(0, 8), fullUrl: window.location.href, hypothesisId: 'D' });
+  }
+}
+// #endregion
+
 interface Submission {
   id: string;
   name: string;

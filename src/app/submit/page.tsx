@@ -39,8 +39,32 @@ export default function SubmitPage() {
   useEffect(() => {
     let hasHandledCallback = false;
 
+    // #region agent log
+    console.log('[DEBUG] Submit page mounted, checking sessionStorage', {
+      authCallback: sessionStorage.getItem('authCallback'),
+      hasPendingScreenshot: !!sessionStorage.getItem('pendingScreenshot'),
+      pendingScreenshotLength: sessionStorage.getItem('pendingScreenshot')?.length,
+      pendingName: sessionStorage.getItem('pendingScreenshotName'),
+      hypothesisId: 'A,C'
+    });
+    // #endregion
+
     const handleAuthCallback = (authUser: User) => {
-      if (hasHandledCallback) return;
+      // #region agent log
+      console.log('[DEBUG] handleAuthCallback called', {
+        hasHandledCallback,
+        hasUser: !!authUser,
+        userId: authUser?.id,
+        authCallback: sessionStorage.getItem('authCallback'),
+        hasPendingScreenshot: !!sessionStorage.getItem('pendingScreenshot'),
+        hypothesisId: 'B,E'
+      });
+      // #endregion
+
+      if (hasHandledCallback) {
+        console.log('[DEBUG] Already handled callback, skipping');
+        return;
+      }
       
       const isAuthCallback = sessionStorage.getItem('authCallback');
       const pendingScreenshot = sessionStorage.getItem('pendingScreenshot');
@@ -49,6 +73,16 @@ export default function SubmitPage() {
       if (isAuthCallback && pendingScreenshot && authUser) {
         hasHandledCallback = true;
         
+        // #region agent log
+        console.log('[DEBUG] Auto-submitting! All conditions met', {
+          isAuthCallback,
+          pendingScreenshotLength: pendingScreenshot.length,
+          pendingName,
+          userId: authUser.id,
+          hypothesisId: 'SUCCESS'
+        });
+        // #endregion
+
         // Clear the flags
         sessionStorage.removeItem('authCallback');
         sessionStorage.removeItem('pendingScreenshot');
@@ -62,13 +96,28 @@ export default function SubmitPage() {
         // Auto-submit
         handleSubmitAfterAuth(authUser, file);
       } else if (isAuthCallback) {
+        // #region agent log
+        console.log('[DEBUG] authCallback set but missing pendingScreenshot', {
+          isAuthCallback,
+          hasPendingScreenshot: !!pendingScreenshot,
+          hasUser: !!authUser,
+          hypothesisId: 'A'
+        });
+        // #endregion
         // Clear flag if no pending data
         sessionStorage.removeItem('authCallback');
+      } else {
+        // #region agent log
+        console.log('[DEBUG] No authCallback flag found', { hypothesisId: 'B' });
+        // #endregion
       }
     };
 
     const checkUser = async () => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
+      // #region agent log
+      console.log('[DEBUG] checkUser result', { hasUser: !!authUser, userId: authUser?.id, hypothesisId: 'E' });
+      // #endregion
       setUser(authUser);
       setAuthLoading(false);
 
@@ -79,6 +128,9 @@ export default function SubmitPage() {
     checkUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // #region agent log
+      console.log('[DEBUG] onAuthStateChange', { event, hasSession: !!session, userId: session?.user?.id, hypothesisId: 'E' });
+      // #endregion
       const authUser = session?.user ?? null;
       setUser(authUser);
       setAuthLoading(false);
@@ -140,14 +192,25 @@ export default function SubmitPage() {
         sessionStorage.setItem('pendingScreenshotName', screenshot?.name || 'screenshot.png');
       }
 
+      const redirectUrl = `${window.location.origin}/auth/callback`;
+      
+      // #region agent log
+      console.log('[DEBUG] Initiating OAuth', { provider, redirectUrl, origin: window.location.origin, hypothesisId: 'A,B' });
+      // #endregion
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: redirectUrl,
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        // #region agent log
+        console.log('[DEBUG] OAuth error', { errorMsg: error.message, hypothesisId: 'A,B' });
+        // #endregion
+        throw error;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed');
     }
