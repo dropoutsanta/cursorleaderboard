@@ -160,7 +160,7 @@ export async function GET(
           </div>
           {user.top_models && user.top_models.length > 0 ? (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-              {user.top_models.slice(0, 3).map((model, idx) => (
+              {user.top_models.slice(0, 3).map((model: string, idx: number) => (
                 <span
                   key={idx}
                   style={{
