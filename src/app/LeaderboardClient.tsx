@@ -1,21 +1,13 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ArrowUpRight, Filter, ImageIcon, X, Github, Share2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-// #region agent log
-if (typeof window !== 'undefined') {
-  const urlParams = new URLSearchParams(window.location.search);
-  const code = urlParams.get('code');
-  if (code) {
-    console.log('[DEBUG] Main page received OAuth code param', { hasCode: true, codePrefix: code.substring(0, 8), fullUrl: window.location.href, hypothesisId: 'D' });
-  }
-}
-// #endregion
+import { createClientBrowser } from '@/lib/supabase';
 
 interface Submission {
   id: string;
@@ -68,6 +60,38 @@ export default function LeaderboardClient({ initialUser }: LeaderboardClientProp
   const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(null);
   const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
   const highlightedRowRef = useRef<HTMLDivElement | null>(null);
+  const router = useRouter();
+
+  // #region agent log - Handle OAuth code if it lands on main page instead of /auth/callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    
+    if (code) {
+      console.log('[DEBUG] Main page received OAuth code, handling auth exchange', { codePrefix: code.substring(0, 8) });
+      
+      const supabase = createClientBrowser();
+      
+      // The Supabase client will automatically exchange the code when we call getSession
+      // after the page loads with the code in the URL
+      supabase.auth.getSession().then(({ data: { session }, error: authError }) => {
+        console.log('[DEBUG] Auth exchange result on main page', { 
+          hasSession: !!session, 
+          hasError: !!authError,
+          errorMsg: authError?.message,
+          userId: session?.user?.id 
+        });
+        
+        if (session) {
+          // Set the authCallback flag and redirect to submit
+          sessionStorage.setItem('authCallback', 'true');
+          console.log('[DEBUG] Session found on main page, redirecting to /submit');
+          router.push('/submit');
+        }
+      });
+    }
+  }, [router]);
+  // #endregion
 
   useEffect(() => {
     fetch('/api/leaderboard')
