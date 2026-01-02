@@ -17,6 +17,15 @@ export default function SubmitPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  // Check immediately if we're returning from auth callback - show loading right away
+  const [isAutoSubmitting, setIsAutoSubmitting] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const isAuthCallback = sessionStorage.getItem('authCallback');
+      const hasPendingScreenshot = !!sessionStorage.getItem('pendingScreenshot');
+      return !!(isAuthCallback && hasPendingScreenshot);
+    }
+    return false;
+  });
   const [step, setStep] = useState<'upload' | 'auth' | 'scanning' | 'success'>('upload');
   const [rank, setRank] = useState<number | null>(null);
   const [scanData, setScanData] = useState<any>(null);
@@ -217,16 +226,46 @@ export default function SubmitPage() {
   };
 
   const handleSubmitAfterAuth = async (authUser: User, fileToUpload: File) => {
+    // #region agent log
+    console.log('[DEBUG] handleSubmitAfterAuth STARTED', { 
+      userId: authUser.id, 
+      fileName: fileToUpload.name,
+      fileSize: fileToUpload.size,
+      fileType: fileToUpload.type
+    });
+    // #endregion
+
     setIsSubmitting(true);
     setError(null);
 
     try {
       const formData = new FormData();
-      formData.append('name', authUser.user_metadata?.user_name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Anonymous');
+      const userName = authUser.user_metadata?.user_name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Anonymous';
+      formData.append('name', userName);
       formData.append('screenshot', fileToUpload);
 
-      const { data: { session } } = await supabase.auth.getSession();
+      // #region agent log
+      console.log('[DEBUG] Getting session for API call', { userName });
+      // #endregion
+
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
+      // #region agent log
+      console.log('[DEBUG] Session result', { 
+        hasSession: !!session, 
+        hasAccessToken: !!session?.access_token,
+        sessionError: sessionError?.message 
+      });
+      // #endregion
+
+      if (!session?.access_token) {
+        throw new Error('No access token available');
+      }
+
+      // #region agent log
+      console.log('[DEBUG] Calling /api/submit...');
+      // #endregion
+
       const response = await fetch('/api/submit', {
         method: 'POST',
         headers: {
@@ -237,24 +276,49 @@ export default function SubmitPage() {
 
       const data = await response.json();
 
+      // #region agent log
+      console.log('[DEBUG] API response', { 
+        ok: response.ok, 
+        status: response.status,
+        hasRank: !!data.rank,
+        hasExtracted: !!data.extracted,
+        error: data.error
+      });
+      // #endregion
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to submit');
       }
 
+      // #region agent log
+      console.log('[DEBUG] Setting scanning step', { rank: data.rank });
+      // #endregion
+
       setRank(data.rank);
       setScanData(data.extracted);
+      setIsAutoSubmitting(false); // Clear auto-submit state before showing scanning
       setStep('scanning');
       
       // Delay to show scanning animation before showing success/rank
       setTimeout(() => {
+        // #region agent log
+        console.log('[DEBUG] Setting success step');
+        // #endregion
         setStep('success');
         setSuccess(true);
       }, 4000);
       
     } catch (err) {
+      // #region agent log
+      console.log('[DEBUG] handleSubmitAfterAuth ERROR', { 
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      });
+      // #endregion
       console.error(err);
       setError(err instanceof Error ? err.message : 'An error occurred');
       setStep('upload');
+      setIsAutoSubmitting(false); // Reset so user can try again
     } finally {
       setIsSubmitting(false);
     }
@@ -288,7 +352,28 @@ export default function SubmitPage() {
       
       <div className="relative w-full max-w-md p-6">
         <AnimatePresence mode="wait">
-          {step === 'success' ? (
+          {/* Show loading immediately when returning from auth callback */}
+          {isAutoSubmitting && step === 'upload' ? (
+            <motion.div
+              key="auto-submitting"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="text-center space-y-6 py-12"
+            >
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full border-2 border-zinc-800 flex items-center justify-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-cursor-blue" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-light text-white">Processing your submission...</h2>
+                  <p className="text-zinc-500 text-sm font-mono">Analyzing your Cursor Wrapped</p>
+                </div>
+              </div>
+            </motion.div>
+          ) : step === 'success' ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
